@@ -1,4 +1,4 @@
-FROM oracle/serverjre:8
+FROM chaman53/weblogic:1.0
 MAINTAINER chamankaushal@gmail.com
 # Environment variables required for this build
 # ---------------------------------------------
