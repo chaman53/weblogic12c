@@ -1,30 +1,73 @@
-FROM chaman53/weblogic:1.0
-MAINTAINER chamankaushal@gmail.com
-# Environment variables required for this build
-# ---------------------------------------------
-ENV ORACLE_HOME=/u01/oracle \
-    USER_MEM_ARGS="-Djava.security.egd=file:/dev/./urandom" \
-    PATH=$PATH:/usr/java/default/bin:/u01/oracle/oracle_common/common/bin
-# Setup required packages, filesystem, and oracle user.
-# Install and configure Oracle JDK
-# Adjust file permissions, go to /u01 as user 'oracle' to proceed with WLS installation
-# ------------------------------------------------------------
-RUN mkdir -p /u01 && \
-    chmod a+xr /u01 && \
-    useradd -b /u01 -d /u01/oracle -m -s /bin/bash oracle
 
-ENV FMW_PKG=fmw_12.1.3.0.0_wls.jar
-
-# Copy packages and files
+# ORACLE DOCKERFILES PROJECT
+# --------------------------
+# This Dockerfile extends the Oracle WebLogic image by creating a sample domain.
+#
+# Util scripts are copied into the image enabling users to plug NodeManager
+# automatically into the AdminServer running on another container.
+#
+# HOW TO BUILD THIS IMAGE
 # -----------------------
-COPY $FMW_PKG install.file oraInst.loc /u01/
-RUN  chown oracle:oracle -R /u01
+# Put all downloaded files in the same directory as this Dockerfile
+# Run:
+#      $ sudo docker build -t 12213-domain
+#
+# Pull base image
+# ---------------
+FROM  chaman53/weblogic:1.4
+
+# Maintainer
+# ----------
+MAINTAINER Kaushal Chaman(chamankausha@gmail.com)
+
+ARG CUSTOM_DOMAIN_NAME="${CUSTOM_DOMAIN_NAME:-base_domain}" 
+
+# WLS Configuration
+# ---------------------------
+ENV DOMAIN_NAME="${CUSTOM_DOMAIN_NAME}" \
+    PRE_DOMAIN_HOME=/u01/oracle/user_projects \
+    ADMIN_HOST="wlsadmin" \
+    NM_PORT="5556" \
+    MS_PORT="8001" \
+    DEBUG_PORT="8453" \
+    ORACLE_HOME=/u01/oracle \
+    SCRIPT_FILE=/u01/oracle/createAndStartWLSDomain.sh \
+    CONFIG_JVM_ARGS="-Dweblogic.security.SSL.ignoreHostnameVerification=true"  \
+    DOMAIN_HOME="/u01/oracle/user_projects/domains/${DOMAIN_NAME}" \ 
+    PATH=$PATH:/u01/oracle/oracle_common/common/bin:/u01/oracle/wlserver/common/bin:${DOMAIN_HOME}:${DOMAIN_HOME}/bin:/u01/oracle
+
+# Domain and Server environment variables
+# ------------------------------------------------------------
+ENV ADMIN_PORT="${ADMIN_PORT:-7001}"  \
+    ADMIN_USERNAME="${ADMIN_USERNAME:-weblogic}" \
+    ADMIN_NAME="${ADMIN_NAME:-AdminServer}" \
+    MS_NAME="${MS_NAME:-""}" \
+    NM_NAME="${NM_NAME:-""}" \
+    ADMIN_PASSWORD="${ADMIN_PASSWORD:-""}" \
+    CLUSTER_NAME="${CLUSTER_NAME:-DockerCluster}" \
+    DEBUG_FLAG=true \
+    PRODUCTION_MODE=dev
+
+# Add files required to build this image
+COPY container-scripts/* /u01/oracle/
+
+#Create directory where domain will be written to
+USER root
+RUN chmod +xw /u01/oracle/*.sh && \
+    chmod +xw /u01/oracle/*.py && \
+    mkdir -p $PRE_DOMAIN_HOME && \
+    chown -R oracle:oracle $PRE_DOMAIN_HOME && \
+    chmod -R a+xwr $PRE_DOMAIN_HOME && \ 
+    mkdir -p $DOMAIN_HOME && \ 
+    chmod -R a+xwr $DOMAIN_HOME
+
+
+VOLUME $PRE_DOMAIN_HOME
+# Expose Node Manager default port, and also default for admin and managed server
+EXPOSE $NM_PORT $ADMIN_PORT $MS_PORT $DEBUG_PORT
 
 USER oracle
-RUN $JAVA_HOME/bin/java -jar /u01/$FMW_PKG -ignoreSysPrereqs -novalidation -silent -responseFile /u01/install.file -invPtrLoc /u01/oraInst.loc -jreLoc $JAVA_HOME ORACLE_HOME=$ORACLE_HOME INSTALL_TYPE="WebLogic Server" && \
-    rm /u01/$FMW_PKG /u01/oraInst.loc /u01/install.file
-
 WORKDIR $ORACLE_HOME
 
 # Define default command to start bash.
-CMD ["bash"]
+CMD ["/u01/oracle/createAndStartWLSDomain.sh"]
