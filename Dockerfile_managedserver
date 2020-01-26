@@ -64,7 +64,7 @@ RUN chmod +xw /u01/oracle/*.sh && \
 
 VOLUME $PRE_DOMAIN_HOME
 # Expose Node Manager default port, and also default for admin and managed server
-EXPOSE $NM_PORT $ADMIN_PORT $MS_PORT $DEBUG_PORT
+EXPOSE $NM_PORT $ADMIN_PORT $MS_PORT $DEBUG_PORT 8200 8100 5100 6100 7100
 
 USER oracle
 WORKDIR $ORACLE_HOME
